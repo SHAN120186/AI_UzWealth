@@ -1,0 +1,146 @@
+{
+  "name": "UzWealth AI — F100 deterministic tests",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "dd2c2a8d-618b-49a1-99c3-ea72aed5e364",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const valid = {\n  event_id: 'F100-001',\n  capital_tiyin: '10000000000',\n  horizon_months: 12,\n  effective_risk: 'moderate',\n  confirmed: true,\n};\nconst duplicate = Object.assign({}, valid);\nconst invalid = {\n  event_id: 'F100-invalid',\n  capital_tiyin: '-100',\n  horizon_months: 12,\n  effective_risk: 'moderate',\n  confirmed: true,\n};\nreturn [valid, duplicate, invalid].map((f) => ({ json: f }));"
+      },
+      "id": "2b9c9b1c-2fee-4b58-9585-3aba97959eff",
+      "name": "Generate fixtures",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// DEMO synthetic prices. All money is BigInt; money in JSON is strings. No parseFloat/Number for money.\nconst C = 10000000000n;\nconst BPS = 10000n;\nconst RISKS = ['conservative', 'moderate', 'aggressive'];\nconst MONEY_RE = /^(0|[1-9][0-9]*)$/;\n\nfunction validate(e) {\n  const errs = [];\n  if (typeof e.event_id !== 'string' || e.event_id.trim() === '') errs.push('event_id');\n  if (typeof e.capital_tiyin !== 'string' || !MONEY_RE.test(e.capital_tiyin) || BigInt(e.capital_tiyin) <= 0n) errs.push('capital_tiyin');\n  if (typeof e.horizon_months !== 'number' || !Number.isInteger(e.horizon_months) || e.horizon_months < 1) errs.push('horizon_months');\n  if (!RISKS.includes(e.effective_risk)) errs.push('effective_risk');\n  if (e.confirmed !== true) errs.push('confirmed');\n  return errs;\n}\n\nfunction fmtBtc(n) {\n  const s = n.toString().padStart(9, '0');\n  return s.slice(0, s.length - 8) + '.' + s.slice(-8);\n}\n\nfunction calculate() {\n  const targets = { deposit: 6000n, gold: 2500n, btc: 1500n };\n  const budget = {\n    deposit: (C * targets.deposit) / BPS,\n    gold: (C * targets.gold) / BPS,\n    btc: (C * targets.btc) / BPS,\n  };\n\n  // Deposit\n  const depositCost = 6000000000n;\n  const depositFee = 0n;\n\n  // Gold: whole bars, max weight within budget, then min cost, then min bar count\n  const barDefs = [\n    { g: 5n, cost: 575000000n },\n    { g: 10n, cost: 1150000000n },\n    { g: 20n, cost: 2300000000n },\n  ];\n  let best = null;\n  for (let a = 0n; a * barDefs[0].cost <= budget.gold; a++) {\n    for (let b = 0n; a * barDefs[0].cost + b * barDefs[1].cost <= budget.gold; b++) {\n      for (let c = 0n; a * barDefs[0].cost + b * barDefs[1].cost + c * barDefs[2].cost <= budget.gold; c++) {\n        const cost = a * barDefs[0].cost + b * barDefs[1].cost + c * barDefs[2].cost;\n        const weight = a * barDefs[0].g + b * barDefs[1].g + c * barDefs[2].g;\n        const count = a + b + c;\n        const cand = { a, b, c, cost, weight, count };\n        if (\n          best === null ||\n          cand.weight > best.weight ||\n          (cand.weight === best.weight && cand.cost < best.cost) ||\n          (cand.weight === best.weight && cand.cost === best.cost && cand.count < best.count)\n        ) {\n          best = cand;\n        }\n      }\n    }\n  }\n  const goldCost = best.cost;\n\n  // BTC: step 0.00000001 BTC costs 1000 tiyin, fee 1% rounded up, min notional 100000 UZS = 10000000 tiyin\n  const STEP_COST = 1000n;\n  const MIN_NOTIONAL = 10000000n;\n  const feeOf = (cost) => (cost + 99n) / 100n;\n  const total = (n) => n * STEP_COST + feeOf(n * STEP_COST);\n  let steps = (budget.btc * 100n) / (101n * STEP_COST);\n  while (total(steps + 1n) <= budget.btc) steps += 1n;\n  while (steps > 0n && total(steps) > budget.btc) steps -= 1n;\n  if (steps * STEP_COST < MIN_NOTIONAL) steps = 0n;\n  const btcCost = steps * STEP_COST;\n  const btcFee = feeOf(btcCost);\n  const nextCost = (steps + 1n) * STEP_COST;\n  const nextFee = feeOf(nextCost);\n\n  const totalFee = depositFee + btcFee;\n  const cash = C - depositCost - goldCost - btcCost - btcFee;\n  const balanceOk = depositCost + goldCost + btcCost + btcFee + cash === C;\n  const capsOk =\n    (depositCost + depositFee) * BPS <= C * targets.deposit &&\n    goldCost * BPS <= C * targets.gold &&\n    (btcCost + btcFee) * BPS <= C * targets.btc;\n\n  // Display net cost shares\n  const D = C - totalFee;\n  const nums = [\n    { id: 'btc', num: btcCost },\n    { id: 'cash', num: cash },\n    { id: 'deposit', num: depositCost },\n    { id: 'gold', num: goldCost },\n  ];\n  const rows = nums.map((r) => ({\n    id: r.id,\n    bps: (r.num * BPS) / D,\n    rem: (r.num * BPS) % D,\n  }));\n  let missing = Number(BPS - rows.reduce((s, r) => s + r.bps, 0n));\n  const order = rows.slice().sort((x, y) => {\n    if (x.rem !== y.rem) return x.rem > y.rem ? -1 : 1;\n    return x.id < y.id ? -1 : 1;\n  });\n  for (let i = 0; i < missing; i++) order[i].bps += 1n;\n  const display = {};\n  rows.forEach((r) => { display[r.id] = Number(r.bps); });\n  display.total = Number(rows.reduce((s, r) => s + r.bps, 0n));\n\n  return {\n    capital_tiyin: C.toString(),\n    targets_bps: { deposit: 6000, gold: 2500, btc: 1500 },\n    budgets_tiyin: {\n      deposit: budget.deposit.toString(),\n      gold: budget.gold.toString(),\n      btc: budget.btc.toString(),\n    },\n    deposit: { cost_tiyin: depositCost.toString(), fee_tiyin: depositFee.toString() },\n    gold: {\n      bars_5g: Number(best.a),\n      bars_10g: Number(best.b),\n      bars_20g: Number(best.c),\n      grams: Number(best.weight),\n      cost_tiyin: goldCost.toString(),\n      fee_tiyin: '0',\n    },\n    btc: {\n      quantity_btc: fmtBtc(steps),\n      steps: steps.toString(),\n      cost_tiyin: btcCost.toString(),\n      fee_tiyin: btcFee.toString(),\n      next_step: {\n        quantity_btc: fmtBtc(steps + 1n),\n        cost_tiyin: nextCost.toString(),\n        fee_tiyin: nextFee.toString(),\n        total_tiyin: (nextCost + nextFee).toString(),\n        exceeds_budget: nextCost + nextFee > budget.btc,\n      },\n    },\n    cash_tiyin: cash.toString(),\n    total_fee_tiyin: totalFee.toString(),\n    balance_ok: balanceOk,\n    hard_caps_ok: capsOk,\n    display_bps: display,\n  };\n}\n\n// Deduplication is only inside this batch (Set). NOT durable idempotency.\nconst seen = new Set();\nconst out = [];\nfor (const item of $input.all()) {\n  const e = item.json;\n  const errs = validate(e);\n  if (errs.length > 0) {\n    out.push({ json: { event_id: e.event_id, status: 'rejected', reason_code: 'VALIDATION_ERROR', invalid_fields: errs } });\n    continue;\n  }\n  if (seen.has(e.event_id)) {\n    out.push({ json: { event_id: e.event_id, status: 'duplicate', reason_code: 'DUPLICATE_IN_BATCH' } });\n    continue;\n  }\n  seen.add(e.event_id);\n  const supported = e.capital_tiyin === '10000000000' && e.horizon_months === 12 && e.effective_risk === 'moderate';\n  if (!supported) {\n    out.push({ json: { event_id: e.event_id, status: 'rejected', reason_code: 'UNSUPPORTED_DEMO_PROFILE' } });\n    continue;\n  }\n  out.push({ json: { event_id: e.event_id, status: 'accepted', allocation: calculate() } });\n}\nreturn out;"
+      },
+      "id": "f20d7a6f-f27f-4464-aa58-a23582745bb1",
+      "name": "Validate deduplicate calculate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map((i) => i.json);\nconst failures = [];\nfunction check(cond, msg) { if (!cond) failures.push(msg); }\n\nconst counts = { accepted: 0, duplicate: 0, rejected: 0 };\nfor (const r of items) {\n  if (counts[r.status] !== undefined) counts[r.status] += 1;\n}\ncheck(items.length === 3, 'expected 3 items, got ' + items.length);\ncheck(counts.accepted === 1, 'accepted count ' + counts.accepted);\ncheck(counts.duplicate === 1, 'duplicate count ' + counts.duplicate);\ncheck(counts.rejected === 1, 'rejected count ' + counts.rejected);\n\nconst rej = items.find((r) => r.status === 'rejected');\ncheck(rej && rej.reason_code === 'VALIDATION_ERROR' && rej.event_id === 'F100-invalid', 'rejected must be F100-invalid / VALIDATION_ERROR');\nconst dup = items.find((r) => r.status === 'duplicate');\ncheck(dup && dup.event_id === 'F100-001', 'duplicate must be F100-001');\n\nconst acc = items.find((r) => r.status === 'accepted');\nconst a = acc ? acc.allocation : null;\nif (!a) {\n  failures.push('no accepted allocation');\n} else {\n  check(a.deposit.cost_tiyin === '6000000000', 'deposit cost ' + a.deposit.cost_tiyin);\n  check(a.gold.cost_tiyin === '2300000000', 'gold cost ' + a.gold.cost_tiyin);\n  check(a.gold.bars_20g === 1 && a.gold.bars_10g === 0 && a.gold.bars_5g === 0, 'gold must be one 20g bar');\n  check(a.btc.quantity_btc === '0.01485148', 'btc quantity ' + a.btc.quantity_btc);\n  check(a.btc.cost_tiyin === '1485148000', 'btc cost ' + a.btc.cost_tiyin);\n  check(a.btc.fee_tiyin === '14851480', 'btc fee ' + a.btc.fee_tiyin);\n  check(a.cash_tiyin === '200000520', 'cash ' + a.cash_tiyin);\n  const sum = BigInt(a.deposit.cost_tiyin) + BigInt(a.deposit.fee_tiyin) + BigInt(a.gold.cost_tiyin) + BigInt(a.gold.fee_tiyin) + BigInt(a.btc.cost_tiyin) + BigInt(a.btc.fee_tiyin) + BigInt(a.cash_tiyin);\n  check(sum === 10000000000n, 'balance sum ' + sum.toString());\n  check(a.balance_ok === true, 'balance_ok flag');\n  check(a.hard_caps_ok === true, 'hard_caps_ok flag');\n  const budgetBtc = BigInt(a.budgets_tiyin.btc);\n  const btcTotal = BigInt(a.btc.cost_tiyin) + BigInt(a.btc.fee_tiyin);\n  check(btcTotal <= budgetBtc, 'btc cost+fee exceeds budget');\n  check(a.btc.next_step.exceeds_budget === true, 'next step flag');\n  check(BigInt(a.btc.next_step.total_tiyin) > budgetBtc, 'next step must exceed budget: ' + a.btc.next_step.total_tiyin);\n  check(a.btc.next_step.quantity_btc === '0.01485149', 'next step quantity ' + a.btc.next_step.quantity_btc);\n  const d = a.display_bps;\n  check(d.deposit === 6009 && d.gold === 2304 && d.btc === 1487 && d.cash === 200 && d.total === 10000, 'display bps ' + JSON.stringify(d));\n}\n\nif (failures.length > 0) {\n  throw new Error('F100 assertions failed: ' + failures.join('; '));\n}\nreturn [{ json: { tests_passed: true, counts, allocation: a } }];"
+      },
+      "id": "8f34831f-983c-46c4-a6ea-b8356c06ea7e",
+      "name": "Assert expected results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "DEMO: synthetic prices and fixed demo profile. This is NOT an investment recommendation.",
+        "width": 320
+      },
+      "id": "6bd8916a-a808-4a69-8257-2fa20fc2eb44",
+      "name": "Note: demo prices",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "content": "The Set used for deduplication lives only inside one run/batch and is NOT kept between runs. Production needs a UNIQUE constraint in PostgreSQL / API Idempotency-Key.",
+        "height": 180,
+        "width": 340
+      },
+      "id": "6c115d37-05bb-4bfd-8564-4447d8862047",
+      "name": "Note: dedup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        416,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "content": "The LLM only explains results. It must NOT calculate shares or amounts: all money math is deterministic BigInt code.",
+        "width": 320
+      },
+      "id": "3bad0fd8-2828-4f42-86c8-717cc7ce1b71",
+      "name": "Note: LLM",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        640,
+        -96
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Generate fixtures",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate fixtures": {
+      "main": [
+        [
+          {
+            "node": "Validate deduplicate calculate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate deduplicate calculate": {
+      "main": [
+        [
+          {
+            "node": "Assert expected results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "60b49b1c-9740-423f-ad31-81eba15acddd",
+  "meta": {
+    "instanceId": "c04262eab87de11eb938c616ea05a4085e3a7d1fedc03efb0a08829f1af47a93"
+  },
+  "nodeGroups": [],
+  "id": "ubNoxSevyePZyeHr",
+  "tags": []
+}

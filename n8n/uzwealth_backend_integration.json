@@ -1,0 +1,602 @@
+{
+  "name": "UzWealth AI — Backend integration draft",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "2c94b437-5bf1-4220-b1f8-e53343eb7f62",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-base-url",
+              "name": "backend_base_url",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "cfg-event-id",
+              "name": "event_id",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4cff328c-dc2b-4eb9-9312-af7039119fc2",
+      "name": "Integration config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        272,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// No network, no secrets. Auth is done only by an n8n Credential on the HTTP nodes.\nconst cfg = $input.first().json;\nconst base = typeof cfg.backend_base_url === 'string' ? cfg.backend_base_url.trim() : '';\nconst eventIdRaw = typeof cfg.event_id === 'string' ? cfg.event_id.trim() : '';\nconst eventId = eventIdRaw.toLowerCase();\nconst missing = [];\nlet origin = '';\nif (base === '') {\n  missing.push('backend_base_url');\n} else {\n  const m = /^https:\\/\\/([A-Za-z0-9.-]+)(:[0-9]{1,5})?(\\/.*)?$/.exec(base);\n  if (!m) missing.push('backend_base_url must be an https:// URL');\n  else origin = 'https://' + m[1] + (m[2] || '');\n}\nif (eventIdRaw === '') missing.push('event_id');\nelse if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(eventId)) missing.push('event_id must be a UUID');\n\nif (missing.length > 0) {\n  return [{ json: { config_ok: false, status: 'error', error_code: 'CONFIG_REQUIRED', message: 'Integration config is incomplete. No HTTP request was made.', missing } }];\n}\n\nconst requestBody = {\n  schema_version: '1.0',\n  locale: 'ru',\n  consent_version: 'terms_v1',\n  privacy_version: 'privacy_v1',\n  parent_job_id: null,\n  input: {\n    kind: 'form',\n    capital_tiyin: '10000000000',\n    horizon_months: 12,\n    selected_risk: 'moderate',\n    loss_capacity: 2,\n    loss_behavior: 1,\n    experience: 2,\n    max_loss_bps: 2000,\n    crypto_opt_in: false,\n    resident_uz: true,\n    adult_confirmed: true,\n    reserve_confirmed: true,\n    risk_acknowledged: true,\n  },\n};\nreturn [{ json: {\n  config_ok: true,\n  backend_origin: origin,\n  create_url: origin + '/api/v1/portfolio/generate',\n  deadline_ms: Date.now() + 45000,\n  idempotency_key: eventId,\n  event_id: eventId,\n  request_body: requestBody,\n} }];"
+      },
+      "id": "c8509d88-dc41-4756-bba1-801d6b8b58ff",
+      "name": "Validate config and request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cfg-ok",
+              "leftValue": "={{ $json.config_ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "115253db-06dc-44b2-ab1d-163678d1b89e",
+      "name": "Config OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        720,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.create_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.idempotency_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request_body) }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": "={{ Math.max(1, Math.min(10000, $json.deadline_ms - Date.now())) }}"
+        }
+      },
+      "id": "266c7440-f24f-4e7d-b9dd-45ab52ac9029",
+      "name": "Create portfolio job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        800,
+        192
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Validate config and request').first().json;\nconst res = $input.first().json;\nconst fail = (code, extra) => [{ json: Object.assign({ poll: false, status: 'error', error_code: code, idempotency_key: cfg.idempotency_key, retry_hint: 'Retry POST only with the same Idempotency-Key.' }, extra) }];\nif (res.error !== undefined && res.statusCode === undefined) {\n  return fail('NETWORK_ERROR', { message: 'POST failed or timed out before a response was received. The job may or may not exist.' });\n}\nif (Date.now() > cfg.deadline_ms) {\n  return fail('DEADLINE_EXCEEDED', { message: 'Shared 45s deadline passed during POST. A late response is not published as success.', http_status: res.statusCode || null });\n}\nconst body = res.body !== null && typeof res.body === 'object' ? res.body : {};\nif (res.statusCode !== 202 || typeof body.job_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.job_id)) {\n  return fail('CREATE_FAILED', { http_status: res.statusCode || null, message: 'Backend did not return 202 with a valid job_id.' });\n}\nreturn [{ json: {\n  poll: true,\n  job_id: body.job_id,\n  poll_url: cfg.backend_origin + '/api/v1/portfolio/jobs/' + encodeURIComponent(body.job_id),\n  idempotency_key: cfg.idempotency_key,\n  deadline_ms: cfg.deadline_ms,\n} }];"
+      },
+      "id": "a3025be2-c34e-4305-bbb1-5727ad4d6e9d",
+      "name": "Init polling",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "poll-ok",
+              "leftValue": "={{ $json.poll }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e64a8f6b-ca2c-45b9-b76e-c96ea2b03873",
+      "name": "Job created?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1248,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const init = $('Init polling').first().json;\nconst remaining = init.deadline_ms - Date.now();\nconst base = { job_id: init.job_id, idempotency_key: init.idempotency_key, remaining_ms: remaining };\nif (remaining < 1000) {\n  return [{ json: Object.assign({ proceed: false, deadline_expired: true }, base) }];\n}\nreturn [{ json: Object.assign({ proceed: true }, base) }];"
+      },
+      "id": "e84b9745-1104-4e6c-8449-2cf503d97316",
+      "name": "Deadline guard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "deadline-ok",
+              "leftValue": "={{ $json.proceed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "525d8113-92b7-4d67-b457-e785c9662dc6",
+      "name": "Deadline OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1552,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Init polling').first().json.poll_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": "={{ Math.max(1, Math.min(8000, $json.remaining_ms)) }}"
+        }
+      },
+      "id": "bd9db7f0-4f01-465e-a048-645a4e097d49",
+      "name": "Get job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1776,
+        208
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const init = $('Init polling').first().json;\nconst res = $input.first().json;\nconst base = { job_id: init.job_id, idempotency_key: init.idempotency_key, poll_attempts: $runIndex + 1, retry_hint: 'Retry POST only with the same Idempotency-Key.' };\nconst err = (code, extra) => [{ json: Object.assign({ wait: false, status: 'error', error_code: code }, base, extra) }];\nconst isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);\n\nif (res.deadline_expired === true) {\n  return err('POLL_TIMEOUT', { message: 'Shared 45s deadline reached before the next GET. The request was not sent.' });\n}\nif (res.error !== undefined && res.statusCode === undefined) {\n  return err('NETWORK_ERROR', { message: 'GET failed or timed out. Do not create a new job: reuse the same Idempotency-Key.' });\n}\nif (Date.now() > init.deadline_ms) {\n  return err('POLL_TIMEOUT', { message: 'Shared 45s deadline passed. A late response is not published.' });\n}\nif (res.statusCode !== 200) {\n  return err('POLL_HTTP_ERROR', { http_status: res.statusCode || null });\n}\nconst body = isObj(res.body) ? res.body : null;\nif (body === null) {\n  return err('BACKEND_RESPONSE_INVALID', { message: 'Response body is not a JSON object.' });\n}\nif (body.job_id !== init.job_id) {\n  return err('BACKEND_RESPONSE_INVALID', { message: 'job_id in response does not match the expected job_id.' });\n}\nconst st = body.status;\nif (st === 'queued' || st === 'running') {\n  // Need 5s of Wait plus at least 1s left for the next GET.\n  if (Date.now() + 6000 > init.deadline_ms) {\n    return err('POLL_TIMEOUT', { message: 'Polling deadline (45s) reached.', last_status: st });\n  }\n  return [{ json: Object.assign({ wait: true, status: 'pending', last_status: st }, base) }];\n}\nif (st === 'needs_input') {\n  if (!isObj(body.clarification)) {\n    return err('BACKEND_RESPONSE_INVALID', { message: 'needs_input requires an object clarification.' });\n  }\n  return [{ json: Object.assign({ wait: false, status: 'clarification', clarification: body.clarification }, base) }];\n}\nif (st === 'completed' || st === 'completed_with_warnings') {\n  if (!isObj(body.result)) {\n    return err('BACKEND_RESPONSE_INVALID', { message: st + ' requires a non-null object result.' });\n  }\n  return [{ json: Object.assign({ wait: false, status: st, result: body.result, warnings: Array.isArray(body.warnings) ? body.warnings : [] }, base) }];\n}\nif (st === 'failed' || st === 'cancelled' || st === 'expired') {\n  return err('JOB_' + st.toUpperCase(), { error: isObj(body.error) ? body.error : null });\n}\nreturn err('BACKEND_RESPONSE_INVALID', { message: 'Unknown job status.', raw_status: typeof st === 'string' ? st : null });"
+      },
+      "id": "203d0d3d-87b5-4e03-94ea-fc0d752126d3",
+      "name": "Evaluate job status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "wait-flag",
+              "leftValue": "={{ $json.wait }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "84699fef-d97a-43ef-a6b2-b18277408ab5",
+      "name": "Keep polling?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        2224,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "5ce28311-5fbf-45e9-a466-ca5b138f5887",
+      "name": "Wait 5s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2448,
+        208
+      ],
+      "webhookId": "768feebc-ea47-4f17-abe8-7ae240b03b11"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json;\nconst out = Object.assign({}, j);\ndelete out.wait; delete out.poll; delete out.config_ok;\nout.draft = true;\nout.note = 'Integration draft: real backend URL and n8n credential are required.';\nreturn [{ json: out }];"
+      },
+      "id": "84b98d19-acf3-4fdd-943a-d7b20a93b0f9",
+      "name": "Structured result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2256,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "content": "INTEGRATION DRAFT, NOT A READY BACKEND. All data is synthetic.\nMissing before it can run:\n1) backend_base_url (HTTPS origin) in \"Integration config\"\n2) n8n Credential \"UzWealth backend API\" (Simplified Custom Auth, not yet created) on both HTTP nodes: no secrets in Code/JSON/URL\n3) event_id: business-event UUID (empty by default; invalid UUID gives CONFIG_REQUIRED before any HTTP). Its lowercase form is used directly as the Idempotency-Key, without a prefix; stored per business event and reused on every retry, never generated per execution.\nPolling: GET only on the same origin, redirects disabled (credentials never leave the origin), 5s interval, one 45s deadline created in Validate that covers POST and waits; stale requests are not sent and late responses are not published. After timeout retry POST only with the SAME key.\nDo not run until the backend exists.",
+        "height": 300,
+        "width": 460
+      },
+      "id": "b07d736d-39a2-4ff2-a6db-287149cd76a0",
+      "name": "Note: missing config",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "content": "n8n is only the orchestration wrapper (integration shell). The production CORE is a separate Python FastAPI/LangGraph backend; this workflow does not replace it and is not the backend. It is a DRAFT: backend URL and auth are not configured yet.\n4 business nodes: extract_profile, get_market_data, quant_allocation, generate_report.\nStorage: PostgreSQL/TimescaleDB + Redis; immutable market snapshot; timestamps/freshness.\nTelegram initData is validated on FastAPI. Disclaimer is static, added by code.",
+        "height": 260,
+        "width": 460
+      },
+      "id": "96e5886e-5f80-4eaa-b465-3b9ea90407c7",
+      "name": "Note: architecture",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        768,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "content": "Crypto default OFF; provider from a verified registry (UzNEX not hardcoded).\nExternal LLM OFF until data processing is agreed; user DB located in Uzbekistan.",
+        "height": 180,
+        "width": 380
+      },
+      "id": "8df88f06-34f4-4677-b7a8-f80061d3307b",
+      "name": "Note: policy",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1296,
+        112
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Integration config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Integration config": {
+      "main": [
+        [
+          {
+            "node": "Validate config and request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate config and request": {
+      "main": [
+        [
+          {
+            "node": "Config OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config OK?": {
+      "main": [
+        [
+          {
+            "node": "Create portfolio job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Structured result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create portfolio job": {
+      "main": [
+        [
+          {
+            "node": "Init polling",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init polling": {
+      "main": [
+        [
+          {
+            "node": "Job created?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Job created?": {
+      "main": [
+        [
+          {
+            "node": "Deadline guard",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Structured result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deadline guard": {
+      "main": [
+        [
+          {
+            "node": "Deadline OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deadline OK?": {
+      "main": [
+        [
+          {
+            "node": "Get job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Evaluate job status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get job": {
+      "main": [
+        [
+          {
+            "node": "Evaluate job status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate job status": {
+      "main": [
+        [
+          {
+            "node": "Keep polling?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep polling?": {
+      "main": [
+        [
+          {
+            "node": "Wait 5s",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Structured result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 5s": {
+      "main": [
+        [
+          {
+            "node": "Deadline guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "25709c06-131f-4e38-8e0b-aa2edc7a8f57",
+  "meta": {
+    "instanceId": "c04262eab87de11eb938c616ea05a4085e3a7d1fedc03efb0a08829f1af47a93"
+  },
+  "nodeGroups": [
+    {
+      "id": "f75236d0-a44b-40b7-a6b4-4dd056ed49df",
+      "name": "Prepare request",
+      "nodeIds": [
+        "4cff328c-dc2b-4eb9-9312-af7039119fc2",
+        "c8509d88-dc41-4756-bba1-801d6b8b58ff",
+        "115253db-06dc-44b2-ab1d-163678d1b89e"
+      ],
+      "description": "Manual start; checks HTTPS backend URL and builds the idempotent request. Stops with CONFIG_REQUIRED."
+    },
+    {
+      "id": "ade81fb0-e56d-41ac-b8d9-b1cb5733cb90",
+      "name": "Create job",
+      "nodeIds": [
+        "266c7440-f24f-4e7d-b9dd-45ab52ac9029",
+        "a3025be2-c34e-4305-bbb1-5727ad4d6e9d",
+        "e64a8f6b-ca2c-45b9-b76e-c96ea2b03873"
+      ],
+      "description": "POSTs the synthetic profile with a stable Idempotency-Key and reads job_id from the 202 reply."
+    },
+    {
+      "id": "79482bad-9b09-4d81-9090-302623817c2e",
+      "name": "Poll job",
+      "nodeIds": [
+        "e84b9745-1104-4e6c-8449-2cf503d97316",
+        "525d8113-92b7-4d67-b457-e785c9662dc6",
+        "bd9db7f0-4f01-465e-a048-645a4e097d49",
+        "203d0d3d-87b5-4e03-94ea-fc0d752126d3",
+        "84699fef-d97a-43ef-a6b2-b18277408ab5",
+        "5ce28311-5fbf-45e9-a466-ca5b138f5887"
+      ],
+      "description": "Checks the shared 45s deadline before each GET, polls the same origin every 5s and classifies the job status."
+    }
+  ],
+  "id": "Nn235rfHspveHoSB",
+  "tags": []
+}

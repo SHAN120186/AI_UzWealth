@@ -1,0 +1,303 @@
+<div id="uzwealth-demo" class="viz-dotted-background">
+  <section class="uw-app" aria-label="Демонстрация UzWealth AI">
+    <header class="uw-header">
+      <div class="uw-brand"><span class="uw-mark" aria-hidden="true">U</span><div><h2>UzWealth AI</h2><div class="uw-small">Пример Telegram Mini App</div></div></div>
+      <span class="uw-demo">Демонстрация • тестовые цены</span>
+    </header>
+    <div class="uw-content">
+      <form class="uw-form" novalidate>
+        <h3>Пример расчёта портфеля</h3>
+        <label for="uw-capital">Сумма, UZS</label>
+        <input id="uw-capital" name="capital" type="text" inputmode="decimal" value="100000000" autocomplete="off">
+        <div class="uw-fields">
+          <div><label for="uw-horizon">Срок, месяцев</label><input id="uw-horizon" name="horizon" type="number" min="1" value="12"></div>
+          <div><label for="uw-risk">Риск</label><select id="uw-risk" name="risk" class="cursor-interaction"><option value="conservative">Консервативный</option><option value="moderate" selected>Умеренный</option><option value="aggressive">Агрессивный</option></select></div>
+        </div>
+        <button class="uw-primary cursor-interaction" type="submit">Рассчитать портфель</button>
+        <div class="uw-small uw-supported">В демо: 100 млн сумов · 12 месяцев · умеренный риск</div>
+      </form>
+      <div class="uw-alert" role="alert" hidden></div>
+      <section class="uw-result" aria-label="Результат расчёта" aria-live="polite">
+        <div class="uw-result-head"><h3>Результат</h3><span class="uw-ok">Баланс сходится</span></div>
+        <dl class="uw-allocations">
+          <div><dt>Банковский депозит</dt><dd data-value="deposit">60 000 000,00</dd></div>
+          <div><dt>Золото <span>1 слиток · 20 г</span></dt><dd data-value="gold">23 000 000,00</dd></div>
+          <div><dt>BTC <span data-value="btc-qty">0,01485148 BTC</span></dt><dd data-value="btc">14 851 480,00</dd></div>
+          <div class="uw-secondary-row"><dt>Комиссия BTC</dt><dd data-value="fee">148 514,80</dd></div>
+          <div><dt>Остаток денег</dt><dd data-value="cash">2 000 005,20</dd></div>
+          <div class="uw-total"><dt>Итого, UZS</dt><dd data-value="total">100 000 000,00</dd></div>
+        </dl>
+        <div class="uw-small">Целые слитки и комиссия учтены. Покупки не выполняются.</div>
+      </section>
+      <section class="uw-tests" aria-label="Проверки расчёта">
+        <h3>Проверьте поведение</h3>
+        <div class="uw-test-actions"><button type="button" class="uw-secondary cursor-interaction" data-action="duplicate">Проверить повтор</button><button type="button" class="uw-secondary cursor-interaction" data-action="invalid">Проверить ошибку</button></div>
+        <div class="uw-test-result uw-small" aria-live="polite">Демонстрационный расчёт выполнен.</div>
+      </section>
+      <footer class="uw-footer"><div>AI и backend ещё не подключены</div><div class="uw-small">Здесь работает проверяемый расчёт на тестовых данных. Это не инвестиционная рекомендация.</div></footer>
+    </div>
+  </section>
+</div>
+<style>
+#uzwealth-demo{--uw-bg:light-dark(#ffffff,#182029);--uw-ink:light-dark(#152c3d,#edf4f7);--uw-muted:light-dark(#536776,#b4c3ce);--uw-line:light-dark(#dbe4e9,#35444f);--uw-soft:light-dark(#f2f7f8,#23333c);--uw-accent:light-dark(#10665f,#83d6c8);--uw-on-accent:light-dark(#ffffff,#10372f);--uw-error:light-dark(#a33428,#ffb5a9);color:var(--uw-ink);font-family:Arial,sans-serif;padding:16px;box-sizing:border-box}
+#uzwealth-demo *{box-sizing:border-box}
+#uzwealth-demo .uw-app{max-width:480px;margin:0 auto;background:var(--uw-bg);border:1px solid var(--uw-line);border-radius:22px;overflow:hidden}
+#uzwealth-demo .uw-header{padding:20px 22px 16px;border-bottom:1px solid var(--uw-line);display:flex;flex-direction:column;gap:14px}
+#uzwealth-demo .uw-brand{display:flex;align-items:center;gap:10px}
+#uzwealth-demo .uw-mark{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:11px;background:var(--uw-accent);color:var(--uw-on-accent);font-size:22px;font-weight:500}
+#uzwealth-demo h2{font-size:19px;font-weight:500;margin:0 0 3px;line-height:1.2}
+#uzwealth-demo h3{font-size:16px;font-weight:500;margin:0 0 14px;line-height:1.35}
+#uzwealth-demo .uw-small{font-size:12px;line-height:1.5;color:var(--uw-muted)}
+#uzwealth-demo .uw-demo{align-self:flex-start;background:var(--uw-soft);padding:6px 9px;border-radius:7px;font-size:12px;color:var(--uw-muted);line-height:1.35}
+#uzwealth-demo .uw-content{padding:21px 22px}
+#uzwealth-demo label{display:block;font-size:13px;line-height:1.4;margin-bottom:6px;color:var(--uw-muted)}
+#uzwealth-demo input,#uzwealth-demo select{display:block;width:100%;min-width:0;min-height:43px;padding:10px 11px;background:var(--uw-bg);color:var(--uw-ink);border:1px solid var(--uw-line);border-radius:9px;font:400 16px Arial,sans-serif}
+#uzwealth-demo .uw-fields{display:grid;grid-template-columns:0.75fr 1.25fr;gap:12px;margin-top:13px}
+#uzwealth-demo button{font:500 14px Arial,sans-serif;min-height:44px;padding:11px 12px;border-radius:9px;line-height:1.35}
+#uzwealth-demo .uw-primary{margin-top:16px;width:100%;background:var(--uw-accent);color:var(--uw-on-accent);border:1px solid var(--uw-accent)}
+#uzwealth-demo .uw-supported{margin-top:8px}
+#uzwealth-demo .uw-result{margin-top:24px}
+#uzwealth-demo .uw-result-head{display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}
+#uzwealth-demo .uw-ok{font-size:12px;color:var(--uw-accent)}
+#uzwealth-demo .uw-allocations{margin:0 0 11px;font-size:14px;line-height:1.4}
+#uzwealth-demo .uw-allocations>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:11px 0;border-bottom:1px solid var(--uw-line)}
+#uzwealth-demo dt{min-width:0}
+#uzwealth-demo dt span{display:block;font-size:12px;color:var(--uw-muted);margin-top:3px}
+#uzwealth-demo dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;align-self:center}
+#uzwealth-demo .uw-secondary-row{color:var(--uw-muted)}
+#uzwealth-demo .uw-allocations .uw-total{border-bottom:0;padding-top:15px;font-weight:500}
+#uzwealth-demo .uw-tests{border-top:1px solid var(--uw-line);margin-top:20px;padding-top:18px}
+#uzwealth-demo .uw-tests h3{margin-bottom:10px}
+#uzwealth-demo .uw-test-actions{display:flex;flex-wrap:wrap;gap:8px}
+#uzwealth-demo .uw-secondary{background:var(--uw-bg);color:var(--uw-ink);border:1px solid var(--uw-line);flex:1}
+#uzwealth-demo .uw-test-result{margin-top:10px;min-height:18px}
+#uzwealth-demo .uw-alert{color:var(--uw-error);font-size:14px;line-height:1.5;margin-top:16px}
+#uzwealth-demo [hidden]{display:none!important}
+#uzwealth-demo .uw-footer{margin-top:18px;padding:13px;border-radius:9px;background:var(--uw-soft);font-size:13px;line-height:1.4}
+#uzwealth-demo .uw-footer .uw-small{margin-top:5px}
+@media(max-width:370px){#uzwealth-demo{padding:6px}#uzwealth-demo .uw-header{padding:17px 15px 14px}#uzwealth-demo .uw-content{padding:18px 15px}#uzwealth-demo .uw-fields{grid-template-columns:1fr}#uzwealth-demo .uw-allocations>div{gap:6px}#uzwealth-demo .uw-allocations{font-size:13px}#uzwealth-demo .uw-test-actions{flex-direction:column}}
+</style>
+<script>
+(()=>{
+  const root=document.getElementById('uzwealth-demo');
+  const form=root.querySelector('form');
+  const result=root.querySelector('.uw-result');
+  const alert=root.querySelector('.uw-alert');
+  const testResult=root.querySelector('.uw-test-result');
+  function runEvents(events){
+    const $input={all:()=>events.map(json=>({json}))};
+    // DEMO synthetic prices. All money is BigInt; money in JSON is strings. No parseFloat/Number for money.
+const C = 10000000000n;
+const BPS = 10000n;
+const RISKS = ['conservative', 'moderate', 'aggressive'];
+const MONEY_RE = /^(0|[1-9][0-9]*)$/;
+
+function validate(e) {
+  const errs = [];
+  if (typeof e.event_id !== 'string' || e.event_id.trim() === '') errs.push('event_id');
+  if (typeof e.capital_tiyin !== 'string' || !MONEY_RE.test(e.capital_tiyin) || BigInt(e.capital_tiyin) <= 0n) errs.push('capital_tiyin');
+  if (typeof e.horizon_months !== 'number' || !Number.isInteger(e.horizon_months) || e.horizon_months < 1) errs.push('horizon_months');
+  if (!RISKS.includes(e.effective_risk)) errs.push('effective_risk');
+  if (e.confirmed !== true) errs.push('confirmed');
+  return errs;
+}
+
+function fmtBtc(n) {
+  const s = n.toString().padStart(9, '0');
+  return s.slice(0, s.length - 8) + '.' + s.slice(-8);
+}
+
+function calculate() {
+  const targets = { deposit: 6000n, gold: 2500n, btc: 1500n };
+  const budget = {
+    deposit: (C * targets.deposit) / BPS,
+    gold: (C * targets.gold) / BPS,
+    btc: (C * targets.btc) / BPS,
+  };
+
+  // Deposit
+  const depositCost = 6000000000n;
+  const depositFee = 0n;
+
+  // Gold: whole bars, max weight within budget, then min cost, then min bar count
+  const barDefs = [
+    { g: 5n, cost: 575000000n },
+    { g: 10n, cost: 1150000000n },
+    { g: 20n, cost: 2300000000n },
+  ];
+  let best = null;
+  for (let a = 0n; a * barDefs[0].cost <= budget.gold; a++) {
+    for (let b = 0n; a * barDefs[0].cost + b * barDefs[1].cost <= budget.gold; b++) {
+      for (let c = 0n; a * barDefs[0].cost + b * barDefs[1].cost + c * barDefs[2].cost <= budget.gold; c++) {
+        const cost = a * barDefs[0].cost + b * barDefs[1].cost + c * barDefs[2].cost;
+        const weight = a * barDefs[0].g + b * barDefs[1].g + c * barDefs[2].g;
+        const count = a + b + c;
+        const cand = { a, b, c, cost, weight, count };
+        if (
+          best === null ||
+          cand.weight > best.weight ||
+          (cand.weight === best.weight && cand.cost < best.cost) ||
+          (cand.weight === best.weight && cand.cost === best.cost && cand.count < best.count)
+        ) {
+          best = cand;
+        }
+      }
+    }
+  }
+  const goldCost = best.cost;
+
+  // BTC: step 0.00000001 BTC costs 1000 tiyin, fee 1% rounded up, min notional 100000 UZS = 10000000 tiyin
+  const STEP_COST = 1000n;
+  const MIN_NOTIONAL = 10000000n;
+  const feeOf = (cost) => (cost + 99n) / 100n;
+  const total = (n) => n * STEP_COST + feeOf(n * STEP_COST);
+  let steps = (budget.btc * 100n) / (101n * STEP_COST);
+  while (total(steps + 1n) <= budget.btc) steps += 1n;
+  while (steps > 0n && total(steps) > budget.btc) steps -= 1n;
+  if (steps * STEP_COST < MIN_NOTIONAL) steps = 0n;
+  const btcCost = steps * STEP_COST;
+  const btcFee = feeOf(btcCost);
+  const nextCost = (steps + 1n) * STEP_COST;
+  const nextFee = feeOf(nextCost);
+
+  const totalFee = depositFee + btcFee;
+  const cash = C - depositCost - goldCost - btcCost - btcFee;
+  const balanceOk = depositCost + goldCost + btcCost + btcFee + cash === C;
+  const capsOk =
+    (depositCost + depositFee) * BPS <= C * targets.deposit &&
+    goldCost * BPS <= C * targets.gold &&
+    (btcCost + btcFee) * BPS <= C * targets.btc;
+
+  // Display net cost shares
+  const D = C - totalFee;
+  const nums = [
+    { id: 'btc', num: btcCost },
+    { id: 'cash', num: cash },
+    { id: 'deposit', num: depositCost },
+    { id: 'gold', num: goldCost },
+  ];
+  const rows = nums.map((r) => ({
+    id: r.id,
+    bps: (r.num * BPS) / D,
+    rem: (r.num * BPS) % D,
+  }));
+  let missing = Number(BPS - rows.reduce((s, r) => s + r.bps, 0n));
+  const order = rows.slice().sort((x, y) => {
+    if (x.rem !== y.rem) return x.rem > y.rem ? -1 : 1;
+    return x.id < y.id ? -1 : 1;
+  });
+  for (let i = 0; i < missing; i++) order[i].bps += 1n;
+  const display = {};
+  rows.forEach((r) => { display[r.id] = Number(r.bps); });
+  display.total = Number(rows.reduce((s, r) => s + r.bps, 0n));
+
+  return {
+    capital_tiyin: C.toString(),
+    targets_bps: { deposit: 6000, gold: 2500, btc: 1500 },
+    budgets_tiyin: {
+      deposit: budget.deposit.toString(),
+      gold: budget.gold.toString(),
+      btc: budget.btc.toString(),
+    },
+    deposit: { cost_tiyin: depositCost.toString(), fee_tiyin: depositFee.toString() },
+    gold: {
+      bars_5g: Number(best.a),
+      bars_10g: Number(best.b),
+      bars_20g: Number(best.c),
+      grams: Number(best.weight),
+      cost_tiyin: goldCost.toString(),
+      fee_tiyin: '0',
+    },
+    btc: {
+      quantity_btc: fmtBtc(steps),
+      steps: steps.toString(),
+      cost_tiyin: btcCost.toString(),
+      fee_tiyin: btcFee.toString(),
+      next_step: {
+        quantity_btc: fmtBtc(steps + 1n),
+        cost_tiyin: nextCost.toString(),
+        fee_tiyin: nextFee.toString(),
+        total_tiyin: (nextCost + nextFee).toString(),
+        exceeds_budget: nextCost + nextFee > budget.btc,
+      },
+    },
+    cash_tiyin: cash.toString(),
+    total_fee_tiyin: totalFee.toString(),
+    balance_ok: balanceOk,
+    hard_caps_ok: capsOk,
+    display_bps: display,
+  };
+}
+
+// Deduplication is only inside this batch (Set). NOT durable idempotency.
+const seen = new Set();
+const out = [];
+for (const item of $input.all()) {
+  const e = item.json;
+  const errs = validate(e);
+  if (errs.length > 0) {
+    out.push({ json: { event_id: e.event_id, status: 'rejected', reason_code: 'VALIDATION_ERROR', invalid_fields: errs } });
+    continue;
+  }
+  if (seen.has(e.event_id)) {
+    out.push({ json: { event_id: e.event_id, status: 'duplicate', reason_code: 'DUPLICATE_IN_BATCH' } });
+    continue;
+  }
+  seen.add(e.event_id);
+  const supported = e.capital_tiyin === '10000000000' && e.horizon_months === 12 && e.effective_risk === 'moderate';
+  if (!supported) {
+    out.push({ json: { event_id: e.event_id, status: 'rejected', reason_code: 'UNSUPPORTED_DEMO_PROFILE' } });
+    continue;
+  }
+  out.push({ json: { event_id: e.event_id, status: 'accepted', allocation: calculate() } });
+}
+return out;
+  }
+  const fixture={event_id:'F100-001',capital_tiyin:'10000000000',horizon_months:12,effective_risk:'moderate',confirmed:true};
+  function money(tiyin){
+    const value=BigInt(tiyin);
+    const whole=(value/100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+    return whole+','+(value%100n).toString().padStart(2,'0');
+  }
+  function toTiyin(input){
+    const raw=input.replace(/\s/g,'').replace(',','.');
+    if(!/^-?\d+(\.\d{1,2})?$/.test(raw))return 'invalid';
+    const negative=raw.startsWith('-');
+    const parts=raw.replace('-','').split('.');
+    const n=BigInt(parts[0])*100n+BigInt((parts[1]||'').padEnd(2,'0'));
+    return (negative?-n:n).toString();
+  }
+  function show(output){
+    if(output.status!=='accepted'){
+      result.hidden=true;alert.hidden=false;
+      if(output.reason_code==='UNSUPPORTED_DEMO_PROFILE')alert.textContent='Этот сценарий ещё не реализован. Для проверки используйте 100 000 000 UZS, 12 месяцев и умеренный риск.';
+      else{
+        const names={capital_tiyin:'сумма должна быть положительным числом с точностью до тийина',horizon_months:'срок должен быть целым числом от 1 месяца',effective_risk:'выберите профиль риска',confirmed:'нужно подтверждение профиля',event_id:'отсутствует номер запроса'};
+        alert.textContent='Расчёт отклонён: '+(output.invalid_fields||[]).map(field=>names[field]||field).join('; ')+'.';
+      }
+      return;
+    }
+    alert.hidden=true;result.hidden=false;
+    const a=output.allocation;
+    const fields={deposit:a.deposit.cost_tiyin,gold:a.gold.cost_tiyin,btc:a.btc.cost_tiyin,fee:a.btc.fee_tiyin,cash:a.cash_tiyin,total:a.capital_tiyin};
+    Object.entries(fields).forEach(([name,value])=>{root.querySelector('[data-value="'+name+'"]').textContent=money(value)});
+    root.querySelector('[data-value="btc-qty"]').textContent=a.btc.quantity_btc.replace('.',',')+' BTC';
+  }
+  form.addEventListener('submit',event=>{
+    event.preventDefault();
+    const profile={...fixture,capital_tiyin:toTiyin(root.querySelector('#uw-capital').value),horizon_months:Number(root.querySelector('#uw-horizon').value),effective_risk:root.querySelector('#uw-risk').value};
+    const output=runEvents([profile])[0].json;
+    show(output);
+    testResult.textContent=output.status==='accepted'?'Демонстрационный расчёт выполнен. Запрос в n8n и AI не отправлялся.':'Запрос отклонён. Расчёт не выполнялся.';
+  });
+  root.querySelector('[data-action="duplicate"]').addEventListener('click',()=>{
+    const events=runEvents([fixture,{...fixture}]).map(item=>item.json);
+    testResult.textContent=events[0].status==='accepted'&&events[1].status==='duplicate'?'Повтор распознан: первый запрос принят, второй пропущен. Проверка действует внутри одного запуска.':'Проверка повтора не пройдена.';
+  });
+  root.querySelector('[data-action="invalid"]').addEventListener('click',()=>{
+    const output=runEvents([{...fixture,event_id:'F100-invalid',capital_tiyin:'-100'}])[0].json;
+    testResult.textContent=output.status==='rejected'&&output.reason_code==='VALIDATION_ERROR'?'Ошибка распознана: отрицательная сумма отклонена. Новый портфель не рассчитан.':'Проверка ошибки не пройдена.';
+  });
+  show(runEvents([fixture])[0].json);
+})();
+</script>
